@@ -6,7 +6,7 @@ on:
   workflow_dispatch:          # botão "Run workflow"
   push:
     branches: [main]
-    paths: [conf/**, scripts/**, .github/workflows/**]
+    paths: [conf/**, scripts/**, game/**, .github/workflows/**]
 
 permissions:
   contents: write
@@ -46,5 +46,35 @@ jobs:
         with:
           target_branch: output
           build_dir: dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  game:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build game page with my contributions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p site
+          cp game/index.html site/
+          touch site/.nojekyll
+          gh api graphql -F login='${{ github.repository_owner }}' -f query='
+            query($login: String!) {
+              user(login: $login) {
+                contributionsCollection {
+                  contributionCalendar {
+                    weeks { contributionDays { date contributionLevel } }
+                  }
+                }
+              }
+            }' > site/data.json
+
+      - uses: crazy-max/ghaction-github-pages@v4
+        with:
+          target_branch: gh-pages
+          build_dir: site
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
