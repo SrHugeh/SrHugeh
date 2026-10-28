@@ -6,7 +6,7 @@ on:
   workflow_dispatch:          # botão "Run workflow"
   push:
     branches: [main]
-    paths: [conf/**, .github/workflows/**]
+    paths: [conf/**, scripts/**, .github/workflows/**]
 
 permissions:
   contents: write
@@ -22,6 +22,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           USERNAME: ${{ github.repository_owner }}
           SETTING_JSON: conf/3d.json
+
+      - name: Aplicar onda verde-água
+        run: python3 scripts/aqua.py profile-3d-contrib/aqua.svg
 
       - uses: crazy-max/ghaction-github-pages@v4
         with:
