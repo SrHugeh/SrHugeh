@@ -1,0 +1,13 @@
+[
+  {
+    "type": "normal",
+    "fileName": "aqua.svg",
+    "backgroundColor": "#071a1a",
+    "foregroundColor": "#e3f6f2",
+    "strongColor": "#3ee6c4",
+    "weakColor": "#4f817a",
+    "radarColor": "#3ee6c4",
+    "growingAnimation": true,
+    "contribColors": ["#0d2a29", "#0f5a50", "#159a86", "#2fd3b4", "#a7f3e4"]
+  }
+]
