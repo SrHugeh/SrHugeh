@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>srhugeh / snake</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23071a1a'/><rect x='3' y='7' width='3' height='3' fill='%233ee6c4'/><rect x='6' y='7' width='3' height='3' fill='%233ee6c4'/><rect x='9' y='7' width='3' height='3' fill='%23a7f3e4'/></svg>" />
+<style>
+  :root {
+    --bg: #071a1a;
+    --panel: #0b2322;
+    --line: #1d4a45;
+    --aqua: #3ee6c4;
+    --light: #a7f3e4;
+    --text: #e3f6f2;
+    --dim: #4f817a;
+    --l0: #0d2a29;
+    --l1: #0f5a50;
+    --l2: #159a86;
+    --l3: #2fd3b4;
+    --l4: #a7f3e4;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    font-size: 14px;
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(to bottom, rgba(0,0,0,.18) 0 2px, transparent 2px 4px),
+      radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(0,0,0,.55) 100%);
+  }
+  main { width: min(1060px, 100% - 32px); }
+  .prompt { color: var(--light); margin: 0 0 18px; }
+  .prompt b { color: var(--aqua); font-weight: 400; }
+  .prompt span { color: var(--text); }
+  .hud {
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    color: var(--dim);
+  }
+  .hud output { color: var(--text); }
+  .board {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 14px;
+    overflow-x: auto;
+  }
+  canvas { display: block; margin: 0 auto; touch-action: none; }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: rgba(7, 26, 26, .82);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 12px;
+  }
+  .overlay[hidden] { display: none; }
+  .overlay strong { color: var(--aqua); font-weight: 400; }
+  .overlay small { color: var(--dim); }
+  .help { color: var(--dim); margin-top: 14px; line-height: 1.7; }
+  .help kbd {
+    font: inherit;
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-bottom-width: 3px;
+    padding: 0 6px;
+    background: var(--panel);
+  }
+  .pad {
+    display: none;
+    grid-template-columns: repeat(3, 56px);
+    grid-template-rows: repeat(2, 48px);
+    gap: 8px;
+    justify-content: center;
+    margin-top: 18px;
+  }
+  .pad button {
+    font: inherit;
+    font-size: 18px;
+    color: var(--aqua);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-bottom-width: 4px;
+  }
+  .pad button:active { border-bottom-width: 1px; transform: translateY(3px); }
+  .pad .up { grid-column: 2; }
+  .pad .left { grid-column: 1; grid-row: 2; }
+  .pad .down { grid-column: 2; grid-row: 2; }
+  .pad .right { grid-column: 3; grid-row: 2; }
+  button:focus-visible { outline: 2px solid var(--aqua); outline-offset: 2px; }
+  a { color: var(--aqua); }
+  @media (pointer: coarse) { .pad { display: grid; } .keys { display: none; } }
+</style>
+</head>
+<body>
+<main>
+  <p class="prompt">~/srhugeh <b>$</b> <span>./snake --graph contributions</span></p>
+
+  <div class="hud" aria-live="polite">
+    <div>score <output id="score">0</output></div>
+    <div>best <output id="best">0</output></div>
+    <div>left <output id="left">0</output></div>
+    <div id="source"></div>
+  </div>
+
+  <div class="board">
+    <canvas id="c" aria-label="snake game on the contribution graph"></canvas>
+    <div class="overlay" id="overlay">
+      <div>
+        <strong id="title">snake</strong><br />
+        <span id="msg">eat my contributions. brighter squares are worth more.</span><br />
+        <small id="hint">press space or tap to start</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="pad" aria-label="controls">
+    <button class="up" data-dir="up" aria-label="up">↑</button>
+    <button class="left" data-dir="left" aria-label="left">←</button>
+    <button class="down" data-dir="down" aria-label="down">↓</button>
+    <button class="right" data-dir="right" aria-label="right">→</button>
+  </div>
+
+  <p class="help keys">
+    <kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd> or <kbd>w</kbd><kbd>a</kbd><kbd>s</kbd><kbd>d</kbd> to move,
+    <kbd>space</kbd> to start or pause. edges wrap around.
+    <br /><a href="https://github.com/SrHugeh">back to github</a>
+  </p>
+</main>
+
+<script>
+(() => {
+  const COLS = 53, ROWS = 7;
+  const LEVELS = { NONE: 0, FIRST_QUARTILE: 1, SECOND_QUARTILE: 2, THIRD_QUARTILE: 3, FOURTH_QUARTILE: 4 };
+  const css = getComputedStyle(document.documentElement);
+  const C = k => css.getPropertyValue(k).trim();
+  const COLORS = [C('--l0'), C('--l1'), C('--l2'), C('--l3'), C('--l4')];
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const overlay = $('overlay');
+
+  let grid = [];          // grid[x][y] = level 0..4
+  let snake, dir, queue, score, alive, running, timer, tick, food, cell, gap;
+  let best = 0;
+  try { best = Number(localStorage.getItem('srhugeh-snake-best')) || 0; } catch (e) {}
+  $('best').textContent = best;
+
+  function demoGrid() {
+    return Array.from({ length: COLS }, () =>
+      Array.from({ length: ROWS }, () => {
+        const r = Math.random();
+        return r < 0.45 ? 0 : r < 0.7 ? 1 : r < 0.85 ? 2 : r < 0.95 ? 3 : 4;
+      }));
+  }
+
+  async function loadGrid() {
+    try {
+      const res = await fetch('data.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error(res.status);
+      const json = await res.json();
+      const weeks = json.data.user.contributionsCollection.contributionCalendar.weeks.slice(-COLS);
+      const g = Array.from({ length: COLS }, () => Array(ROWS).fill(0));
+      const offset = COLS - weeks.length;
+      weeks.forEach((w, i) => w.contributionDays.forEach(d => {
+        const y = new Date(d.date + 'T00:00:00Z').getUTCDay();
+        g[i + offset][y] = LEVELS[d.contributionLevel] || 0;
+      }));
+      const total = g.flat().filter(v => v > 0).length;
+      if (total < 8) throw new Error('too few contributions');
+      $('source').textContent = 'my real contributions';
+      return g;
+    } catch (e) {
+      $('source').textContent = 'demo graph';
+      return demoGrid();
+    }
+  }
+
+  function size() {
+    const avail = Math.min(canvas.parentElement.clientWidth - 30, 1030);
+    gap = avail < 600 ? 2 : 3;
+    cell = Math.max(9, Math.floor((avail - gap * (COLS - 1)) / COLS));
+    const w = COLS * cell + (COLS - 1) * gap;
+    const h = ROWS * cell + (ROWS - 1) * gap;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function reset() {
+    food = grid.map(col => col.slice());
+    snake = [{ x: 3, y: 3 }, { x: 2, y: 3 }, { x: 1, y: 3 }];
+    snake.forEach(s => { food[s.x][s.y] = 0; });
+    dir = { x: 1, y: 0 }; queue = [];
+    score = 0; alive = true; tick = 170;
+    updateHud(); draw();
+  }
+
+  function left() { return food.flat().filter(v => v > 0).length; }
+  function updateHud() { $('score').textContent = score; $('left').textContent = left(); }
+
+  function rect(x, y, color, inset = 0) {
+    const r = Math.max(2, cell * 0.2);
+    const px = x * (cell + gap) + inset, py = y * (cell + gap) + inset, s = cell - inset * 2;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(px, py, s, s, r) : ctx.rect(px, py, s, s);
+    ctx.fill();
+  }
+
+  function draw() {
+    if (!food) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let x = 0; x < COLS; x++)
+      for (let y = 0; y < ROWS; y++) rect(x, y, COLORS[food[x][y]]);
+    snake.forEach((s, i) => {
+      const t = i / Math.max(1, snake.length - 1);
+      ctx.shadowColor = C('--aqua');
+      ctx.shadowBlur = i === 0 ? 14 : 0;
+      rect(s.x, s.y, i === 0 ? C('--light') : `rgba(62,230,196,${1 - t * 0.55})`, 1);
+    });
+    ctx.shadowBlur = 0;
+  }
+
+  function step() {
+    if (queue.length) {
+      const n = queue.shift();
+      if (n.x !== -dir.x || n.y !== -dir.y) dir = n;
+    }
+    const head = {
+      x: (snake[0].x + dir.x + COLS) % COLS,
+      y: (snake[0].y + dir.y + ROWS) % ROWS,
+    };
+    const eating = food[head.x][head.y];
+    const body = eating ? snake : snake.slice(0, -1);
+    if (body.some(s => s.x === head.x && s.y === head.y)) return end(false);
+    snake.unshift(head);
+    if (eating) {
+      score += eating;
+      food[head.x][head.y] = 0;
+      tick = Math.max(70, tick - 2);
+      if (navigator.vibrate) navigator.vibrate(8);
+    } else {
+      snake.pop();
+    }
+    updateHud(); draw();
+    if (!left()) return end(true);
+    timer = setTimeout(step, tick);
+  }
+
+  function start() {
+    if (running) return;
+    if (!alive) reset();
+    running = true;
+    overlay.hidden = true;
+    timer = setTimeout(step, tick);
+  }
+
+  function pause() {
+    if (!running) return;
+    running = false;
+    clearTimeout(timer);
+    show('paused', 'take your time.', 'press space or tap to continue');
+  }
+
+  function end(won) {
+    running = false; alive = false;
+    clearTimeout(timer);
+    if (score > best) {
+      best = score;
+      try { localStorage.setItem('srhugeh-snake-best', best); } catch (e) {}
+      $('best').textContent = best;
+    }
+    show(won ? 'graph cleared' : 'game over',
+         `score ${score}${score === best && score > 0 ? ', new best' : ''}.`,
+         'press space or tap to play again');
+  }
+
+  function show(title, msg, hint) {
+    $('title').textContent = title; $('msg').textContent = msg; $('hint').textContent = hint;
+    overlay.hidden = false;
+  }
+
+  const DIRS = {
+    up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 },
+  };
+  const KEYS = {
+    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+    w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right',
+  };
+
+  function turn(name) {
+    if (!running) start();
+    const last = queue[queue.length - 1] || dir;
+    const n = DIRS[name];
+    if (n.x === last.x && n.y === last.y) return;
+    if (queue.length < 3) queue.push(n);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === ' ') { e.preventDefault(); running ? pause() : start(); return; }
+    if (KEYS[e.key]) { e.preventDefault(); turn(KEYS[e.key]); }
+  });
+
+  overlay.addEventListener('click', start);
+  document.querySelectorAll('.pad button').forEach(b =>
+    b.addEventListener('pointerdown', e => { e.preventDefault(); turn(b.dataset.dir); }));
+
+  let touch = null;
+  canvas.addEventListener('pointerdown', e => { touch = { x: e.clientX, y: e.clientY }; });
+  canvas.addEventListener('pointerup', e => {
+    if (!touch) return;
+    const dx = e.clientX - touch.x, dy = e.clientY - touch.y;
+    touch = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+    turn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+  });
+
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+  window.addEventListener('resize', size);
+
+  loadGrid().then(g => { grid = g; reset(); size(); });
+})();
+</script>
+</body>
+</html>
